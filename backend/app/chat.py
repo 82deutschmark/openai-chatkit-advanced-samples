@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+import os
 from datetime import datetime
 from typing import Annotated, Any, AsyncIterator, Final, Literal
 from uuid import uuid4
@@ -30,7 +31,7 @@ from pydantic import ConfigDict, Field
 
 from .constants import INSTRUCTIONS, MODEL
 from .facts import Fact, fact_store
-from .memory_store import MemoryStore
+from .openai_store import OpenAIStore, OpenAIVectorAttachmentStore
 from .sample_widget import render_weather_widget, weather_widget_copy_text
 from .weather import (
     WeatherLookupError,
@@ -217,12 +218,23 @@ def _user_message_text(item: UserMessageItem) -> str:
     return " ".join(parts).strip()
 
 
+ATTACHMENT_VECTOR_STORE_ID_ENV = "FACT_ASSISTANT_VECTOR_STORE_ID"
+"""Environment variable used to configure file uploads."""
+
+
 class FactAssistantServer(ChatKitServer[dict[str, Any]]):
     """ChatKit server wired up with the fact-recording tool."""
 
     def __init__(self) -> None:
-        self.store: MemoryStore = MemoryStore()
-        super().__init__(self.store)
+        vector_store_id = os.getenv(
+            ATTACHMENT_VECTOR_STORE_ID_ENV,
+            "vs_68fffb393e7c81918c53643ecf212d0f",
+        )
+        self.store: OpenAIStore = OpenAIStore(vector_store_id)
+        self.attachment_store: OpenAIVectorAttachmentStore = (
+            self.store.attachment_store
+        )
+        super().__init__(self.store, attachment_store=self.attachment_store)
         tools = [save_fact, switch_theme, get_weather]
         self.assistant = Agent[FactAgentContext](
             model=MODEL,
@@ -265,8 +277,9 @@ class FactAssistantServer(ChatKitServer[dict[str, Any]]):
             yield event
         return
 
-    async def to_message_content(self, _input: Attachment) -> ResponseInputContentParam:
-        raise RuntimeError("File attachments are not supported in this demo.")
+    async def to_message_content(self, attachment: Attachment) -> ResponseInputContentParam:
+        file_id = await self.store.get_vector_file_id(attachment.id)
+        return {"type": "input_file", "file_id": file_id}
 
     def _init_thread_item_converter(self) -> Any | None:
         converter_cls = ThreadItemConverter
