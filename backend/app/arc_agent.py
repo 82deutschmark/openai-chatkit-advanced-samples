@@ -29,22 +29,32 @@ def _get_agent_model() -> str:
     return os.getenv("ARC_AGENT_MODEL", ARC_AGENT_MODEL_DEFAULT)
 
 
+def get_arc_base_url() -> str:
+    """Return the configured ARC Explainer base URL."""
+    return _get_arc_base_url()
+
+
+def get_default_arc_model() -> str:
+    """Return the configured default model for ARC Explainer analyses."""
+    return _get_arc_model()
+
+
 class ArcAgentContext(AgentContext):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     arc_base_url: str = _get_arc_base_url()
     arc_default_model: str = _get_arc_model()
 
 
-async def _arc_request(
-    ctx: RunContextWrapper[ArcAgentContext],
+async def arc_api_request(
     method: str,
     path: str,
     *,
     params: dict[str, Any] | None = None,
     json: dict[str, Any] | None = None,
+    base_url: str | None = None,
 ) -> Any:
-    base_url = getattr(ctx.context, "arc_base_url", _get_arc_base_url())
-    url = f"{base_url}{path}"
+    root = (base_url or _get_arc_base_url()).rstrip("/")
+    url = f"{root}{path}"
     logger.debug("ARC Explainer request", extra={"method": method, "url": url, "params": params})
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -69,7 +79,25 @@ async def _arc_request(
     return response.text
 
 
-def _encode_path_segment(value: str) -> str:
+async def _arc_request(
+    ctx: RunContextWrapper[ArcAgentContext],
+    method: str,
+    path: str,
+    *,
+    params: dict[str, Any] | None = None,
+    json: dict[str, Any] | None = None,
+) -> Any:
+    base_url = getattr(ctx.context, "arc_base_url", _get_arc_base_url())
+    return await arc_api_request(
+        method,
+        path,
+        params=params,
+        json=json,
+        base_url=base_url,
+    )
+
+
+def encode_path_segment(value: str) -> str:
     return quote(value, safe="")
 
 
@@ -92,7 +120,7 @@ async def arc_fetch_puzzle(
     ctx: RunContextWrapper[ArcAgentContext],
     task_id: str,
 ) -> dict[str, Any]:
-    encoded_task_id = _encode_path_segment(task_id)
+    encoded_task_id = encode_path_segment(task_id)
     data = await _arc_request(ctx, "GET", f"/api/puzzle/task/{encoded_task_id}")
     return {"puzzle": data}
 
@@ -116,8 +144,8 @@ async def arc_run_analysis(
     extra_options: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     chosen_model = model or getattr(ctx.context, "arc_default_model", _get_arc_model())
-    encoded_task_id = _encode_path_segment(task_id)
-    encoded_model = _encode_path_segment(chosen_model)
+    encoded_task_id = encode_path_segment(task_id)
+    encoded_model = encode_path_segment(chosen_model)
     payload: dict[str, Any] = {}
     if prompt_id is not None:
         payload["promptId"] = prompt_id
@@ -148,7 +176,7 @@ async def arc_has_explanation(
     ctx: RunContextWrapper[ArcAgentContext],
     puzzle_id: str,
 ) -> dict[str, Any]:
-    encoded_puzzle_id = _encode_path_segment(puzzle_id)
+    encoded_puzzle_id = encode_path_segment(puzzle_id)
     data = await _arc_request(
         ctx,
         "GET",
@@ -165,7 +193,7 @@ async def arc_save_explanation(
     custom_challenge: str | None = None,
     tags: list[str] | None = None,
 ) -> dict[str, Any]:
-    encoded_puzzle_id = _encode_path_segment(puzzle_id)
+    encoded_puzzle_id = encode_path_segment(puzzle_id)
     payload: dict[str, Any] = {"explanation": explanation}
     if custom_challenge is not None:
         payload["customChallenge"] = custom_challenge
