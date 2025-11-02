@@ -66,6 +66,7 @@ class ARCVisualSolver:
     
     def load_task(self, file_path: str) -> Dict[str, Any]:
         """Load an ARC-AGI task from a JSON file"""
+        #  These can be sourced from the ARC Explainer API
         with open(file_path, 'r') as f:
             return json.load(f)
     
