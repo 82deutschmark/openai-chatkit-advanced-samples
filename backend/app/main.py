@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from chatkit.server import StreamingResult
+from chatkit.store import NotFoundError
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import Response, StreamingResponse
 from starlette.responses import JSONResponse
@@ -43,6 +44,33 @@ async def chatkit_endpoint(
     if hasattr(result, "json"):
         return Response(content=result.json, media_type="application/json")
     return JSONResponse(result)
+
+
+@app.put("/attachments/{attachment_id}")
+async def upload_attachment(
+    attachment_id: str,
+    request: Request,
+    server: FactAssistantServer = Depends(get_chatkit_server),
+) -> dict[str, Any]:
+    attachment_store = getattr(server, "attachment_store", None)
+    if attachment_store is None or not hasattr(attachment_store, "upload_attachment"):
+        raise HTTPException(status_code=404, detail="Attachment uploads are disabled")
+
+    payload = await request.body()
+    if not payload:
+        raise HTTPException(status_code=400, detail="Attachment payload is empty")
+
+    content_type = request.headers.get("content-type")
+    try:
+        attachment = await attachment_store.upload_attachment(  # type: ignore[attr-defined]
+            attachment_id,
+            payload,
+            mime_type=content_type,
+        )
+    except NotFoundError as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return {"attachment": attachment.model_dump()}
 
 
 @app.get("/facts")
