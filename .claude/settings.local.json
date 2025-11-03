@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Where-Object {$_andles -gt 100})",
+      "Bash(Stop-Process -Force)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

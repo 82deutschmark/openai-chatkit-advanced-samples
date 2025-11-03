@@ -12,6 +12,7 @@ from starlette.responses import JSONResponse
 
 from .arc_agent import arc_api_request, encode_path_segment, get_default_arc_model
 from .chat import ArcAssistantServer, create_chatkit_server
+from .facts import fact_store
 
 app = FastAPI(title="ChatKit API")
 
@@ -141,3 +142,28 @@ async def arc_save_puzzle_explanation(
         json=body,
     )
     return {"saved": data}
+
+
+@app.get("/facts")
+async def list_facts() -> dict[str, Any]:
+    """List all saved facts."""
+    facts = await fact_store.list_saved()
+    return {"facts": [fact.as_dict() for fact in facts]}
+
+
+@app.post("/facts/{fact_id}/save")
+async def save_fact(fact_id: str) -> dict[str, Any]:
+    """Mark a fact as saved."""
+    fact = await fact_store.mark_saved(fact_id)
+    if fact is None:
+        raise HTTPException(status_code=404, detail="Fact not found")
+    return {"fact": fact.as_dict()}
+
+
+@app.post("/facts/{fact_id}/discard")
+async def discard_fact(fact_id: str) -> dict[str, Any]:
+    """Discard a pending fact."""
+    fact = await fact_store.discard(fact_id)
+    if fact is None:
+        raise HTTPException(status_code=404, detail="Fact not found")
+    return {"fact": fact.as_dict()}

@@ -8,7 +8,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import "https://cdn.jsdelivr.net/npm/@openai/chatkit@0.0.0/styles.css";
 import "./index.css";
 
 const container = document.getElementById("root");
