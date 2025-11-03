@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import inspect
 import logging
+import os
 from datetime import datetime
-from typing import Annotated, Any, AsyncIterator, Final, Literal
+from typing import Annotated, Any, AsyncIterator, Awaitable, Callable, Final, Literal, cast
 from uuid import uuid4
 
 from agents import Agent, RunContextWrapper, Runner, function_tool
@@ -30,7 +31,7 @@ from pydantic import ConfigDict, Field
 
 from .constants import INSTRUCTIONS, MODEL
 from .facts import Fact, fact_store
-from .memory_store import MemoryStore
+from .openai_store import OpenAIStore, OpenAIVectorAttachmentStore
 from .sample_widget import render_weather_widget, weather_widget_copy_text
 from .weather import (
     WeatherLookupError,
@@ -217,12 +218,42 @@ def _user_message_text(item: UserMessageItem) -> str:
     return " ".join(parts).strip()
 
 
+ATTACHMENT_VECTOR_STORE_ID_ENV = "FACT_ASSISTANT_VECTOR_STORE_ID"
+"""Environment variable used to configure file uploads."""
+
+
+class _AttachmentAwareThreadItemConverter(ThreadItemConverter):
+    """Thread item converter that delegates attachment conversion to a callback."""
+
+    def __init__(
+        self,
+        adapter: Callable[[Attachment], Awaitable[ResponseInputContentParam] | ResponseInputContentParam],
+    ) -> None:
+        super().__init__()
+        self._adapter = adapter
+
+    async def attachment_to_message_content(
+        self, attachment: Attachment
+    ) -> ResponseInputContentParam:
+        result = self._adapter(attachment)
+        if inspect.isawaitable(result):
+            result = await result
+        return cast(ResponseInputContentParam, result)
+
+
 class FactAssistantServer(ChatKitServer[dict[str, Any]]):
     """ChatKit server wired up with the fact-recording tool."""
 
     def __init__(self) -> None:
-        self.store: MemoryStore = MemoryStore()
-        super().__init__(self.store)
+        vector_store_id = os.getenv(
+            ATTACHMENT_VECTOR_STORE_ID_ENV,
+            "vs_68fffb393e7c81918c53643ecf212d0f",
+        )
+        self.store: OpenAIStore = OpenAIStore(vector_store_id)
+        self.attachment_store: OpenAIVectorAttachmentStore = (
+            self.store.attachment_store
+        )
+        super().__init__(self.store, attachment_store=self.attachment_store)
         tools = [save_fact, switch_theme, get_weather]
         self.assistant = Agent[FactAgentContext](
             model=MODEL,
@@ -265,26 +296,40 @@ class FactAssistantServer(ChatKitServer[dict[str, Any]]):
             yield event
         return
 
-    async def to_message_content(self, _input: Attachment) -> ResponseInputContentParam:
-        raise RuntimeError("File attachments are not supported in this demo.")
+    async def to_message_content(self, attachment: Attachment) -> ResponseInputContentParam:
+        file_id = await self.store.get_vector_file_id(attachment.id)
+        return {"type": "input_file", "file_id": file_id}
 
-    def _init_thread_item_converter(self) -> Any | None:
+    def _init_thread_item_converter(self) -> ThreadItemConverter | None:
         converter_cls = ThreadItemConverter
         if converter_cls is None or not callable(converter_cls):
             return None
 
-        attempts: tuple[dict[str, Any], ...] = (
-            {"to_message_content": self.to_message_content},
-            {"message_content_converter": self.to_message_content},
-            {},
-        )
-
-        for kwargs in attempts:
+        try:
+            return _AttachmentAwareThreadItemConverter(self.to_message_content)
+        except Exception:  # pragma: no cover - defensive fallback for older SDKs
+            logger.exception("Failed to initialize attachment-aware ThreadItemConverter")
             try:
-                return converter_cls(**kwargs)
-            except TypeError:
-                continue
-        return None
+                converter = converter_cls()
+            except Exception:  # pragma: no cover - defensive
+                return None
+
+            async def _convert(attachment: Attachment) -> ResponseInputContentParam:
+                converted = self.to_message_content(attachment)
+                if inspect.isawaitable(converted):
+                    converted = await converted
+                return cast(ResponseInputContentParam, converted)
+
+            if hasattr(converter, "attachment_to_message_content"):
+                converter.attachment_to_message_content = _convert  # type: ignore[attr-defined]
+                return converter
+
+            for attr in ("to_message_content", "message_content_converter"):
+                if hasattr(converter, attr):
+                    setattr(converter, attr, _convert)
+                    return converter
+
+            return None
 
     async def _latest_thread_item(
         self, thread: ThreadMetadata, context: dict[str, Any]
