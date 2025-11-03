@@ -1,9 +1,12 @@
-import type { StartScreenPromptDefinition } from "@openai/chatkit";
+const env = import.meta.env as Record<string, string | undefined>;
 
-const { VITE_CHATKIT_API_URL, VITE_CHATKIT_API_DOMAIN_KEY, VITE_FACTS_API_URL } =
-  import.meta.env;
+type StartScreenPrompt = {
+  label: string;
+  prompt: string;
+  icon?: string;
+};
 
-export const CHATKIT_API_URL = VITE_CHATKIT_API_URL ?? "/chatkit";
+export const CHATKIT_API_URL = env.VITE_CHATKIT_API_URL ?? "/chatkit";
 
 /**
  * ChatKit still expects a domain key at runtime. Use any placeholder locally,
@@ -12,15 +15,17 @@ export const CHATKIT_API_URL = VITE_CHATKIT_API_URL ?? "/chatkit";
  * and deploy the real key.
  */
 export const CHATKIT_API_DOMAIN_KEY =
-  VITE_CHATKIT_API_DOMAIN_KEY ?? "domain_pk_localhost_dev";
+  env.VITE_CHATKIT_API_DOMAIN_KEY ?? "domain_pk_localhost_dev";
 
-export const FACTS_API_URL = VITE_FACTS_API_URL ?? "/facts";
+export const FACTS_API_URL = env.VITE_FACTS_API_URL ?? "/facts";
+
+export const ARC_API_URL = env.VITE_ARC_API_URL ?? "/arc";
 
 export const THEME_STORAGE_KEY = "chatkit-boilerplate-theme";
 
 export const GREETING = "Welcome to the ARC Explainer workspace";
 
-export const STARTER_PROMPTS: StartScreenPromptDefinition[] = [
+export const STARTER_PROMPTS: StartScreenPrompt[] = [
   {
     label: "Browse puzzles",
     prompt: "Show me ARC puzzles to explore",
