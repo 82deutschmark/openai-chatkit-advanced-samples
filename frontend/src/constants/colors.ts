@@ -1,3 +1,10 @@
+/*
+ * Author: Cascade (model: Cascade)
+ * Date: 2025-11-02 23:42 UTC-05:00
+ * PURPOSE: Single source of truth for ARC color palette across formats (rgb, hex, tuples).
+ * SRP/DRY check: Pass - centralized palette definitions reused across visualization components.
+ */
+
 /**
  * Single source of truth for ARC-AGI color mapping (indexes 0-9).
  * Exposes multiple formats for flexible use across the app:

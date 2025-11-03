@@ -1,3 +1,10 @@
+/*
+ * Author: Cascade (model: Cascade)
+ * Date: 2025-11-02 23:30 UTC-05:00
+ * PURPOSE: Render ARC puzzle grids with consistent palette mapping for input/output visualization.
+ * SRP/DRY check: Pass - focused rendering utility, reuses shared color constants without duplication.
+ */
+
 import clsx from "clsx";
 
 import { ARC_COLORS } from "../constants/colors";

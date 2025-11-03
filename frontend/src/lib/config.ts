@@ -1,3 +1,10 @@
+/*
+ * Author: Cascade (model: Cascade)
+ * Date: 2025-11-02 23:40 UTC-05:00
+ * PURPOSE: Centralizes frontend runtime configuration for ChatKit and ARC integration values and UI copy.
+ * SRP/DRY check: Pass - single responsibility for exposing environment-derived configuration constants.
+ */
+
 const env = import.meta.env as Record<string, string | undefined>;
 
 type StartScreenPrompt = {
