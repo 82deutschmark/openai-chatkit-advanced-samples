@@ -141,7 +141,6 @@ async def arc_run_analysis(
     original_explanation: str | None = None,
     custom_challenge: str | None = None,
     previous_response_id: str | None = None,
-    extra_options: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     chosen_model = model or getattr(ctx.context, "arc_default_model", _get_arc_model())
     encoded_task_id = encode_path_segment(task_id)
@@ -159,9 +158,6 @@ async def arc_run_analysis(
         payload["customChallenge"] = custom_challenge
     if previous_response_id is not None:
         payload["previousResponseId"] = previous_response_id
-    if extra_options:
-        payload.update(extra_options)
-
     data = await _arc_request(
         ctx,
         "POST",
