@@ -1,17 +1,6 @@
 import clsx from "clsx";
 
-const ARC_COLORS: string[] = [
-  "#000000",
-  "#0074D9",
-  "#2ECC40",
-  "#FF4136",
-  "#FFDC00",
-  "#AAAAAA",
-  "#F012BE",
-  "#FF851B",
-  "#7FDBFF",
-  "#870C25",
-];
+import { ARC_COLORS } from "../constants/colors";
 
 const TEXT_COLOR = "rgba(255, 255, 255, 0.92)";
 
