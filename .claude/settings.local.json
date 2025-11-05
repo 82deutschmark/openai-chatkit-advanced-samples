@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(Where-Object {$_andles -gt 100})",
-      "Bash(Stop-Process -Force)"
+      "Bash(Stop-Process -Force)",
+      "Bash(npm install:*)",
+      "Bash(npm config:*)",
+      "Bash(NODE_ENV=development npm install:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": []

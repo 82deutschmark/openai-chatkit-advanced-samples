@@ -8,6 +8,7 @@ from typing import Annotated, Any, AsyncIterator
 
 from agents import Runner
 from chatkit.agents import ThreadItemConverter, stream_agent_response
+from chatkit.store import Store
 from chatkit.server import ChatKitServer
 from chatkit.types import (
     ClientToolCallItem,
@@ -39,7 +40,7 @@ def _user_message_text(item: UserMessageItem) -> str:
 
 class ArcChatContext(ArcAgentContext):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    store: Annotated[MemoryStore, Field(exclude=True)]
+    store: Annotated[Store[dict[str, Any]], Field(exclude=True)]
     request_context: dict[str, Any]
 
 
